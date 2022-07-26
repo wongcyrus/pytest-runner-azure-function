@@ -1,0 +1,12 @@
+swagger: '2.0'
+info:
+  version: 1.0.0
+  title: Simple example API
+  description: An API to illustrate Swagger
+paths:
+  /list:
+    get:
+      description: Returns a list of stuff              
+      responses:
+        200:
+          description: Successful response 
