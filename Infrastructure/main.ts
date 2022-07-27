@@ -1,13 +1,11 @@
 import { Construct } from "constructs";
 import { App, TerraformStack } from "cdktf";
 import {
-  AzurermProvider, ResourceGroup,
-  ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy,
-  LinuxFunctionApp, ServicePlan, StorageAccount, ApplicationInsights, DataAzurermFunctionAppHostKeys
+  AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, ApplicationInsights, DataAzurermFunctionAppHostKeys,
+  ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation
 } from "cdktf-azure-providers/.gen/providers/azurerm";
 
 import * as dotenv from 'dotenv';
-import path = require("path");
 dotenv.config({ path: __dirname + '/.env' });
 
 class PyTestRunnerStack extends TerraformStack {
@@ -30,7 +28,7 @@ class PyTestRunnerStack extends TerraformStack {
     })
 
     const storageAccount = new StorageAccount(this, "StorageAccount", {
-      name: (prefix + environment ).toLocaleLowerCase(),
+      name: (prefix + environment).toLocaleLowerCase(),
       location: resourceGroup.location,
       resourceGroupName: resourceGroup.name,
       accountTier: "Standard",
@@ -92,18 +90,28 @@ class PyTestRunnerStack extends TerraformStack {
       value: dataAzurermFunctionAppHostKeys.primaryKey,
       secret: true
     })
-    const openapiFilePath = path.join(__dirname, "openapi.json");
+
     const apiManagementApi = new ApiManagementApi(this, "ApiManagementApi", {
       name: "pytest-runner",
       resourceGroupName: resourceGroup.name,
       apiManagementName: apiManagement.name,
-      revision: "1",
-      displayName: "Pytest Runner",      
-      protocols: ["https"],
-      import: {
-        contentFormat: "swagger-json",
-        contentValue: `file(${openapiFilePath})`
-      }
+      revision: "2",
+      displayName: "Pytest Runner",
+      protocols: ["https"]
+    })
+
+    new ApiManagementApiOperation(this, "ApiManagementApiOperation", {
+      operationId: "getter",
+      apiManagementName: apiManagementApi.apiManagementName,
+      apiName: apiManagementApi.name,
+      resourceGroupName: resourceGroup.name,
+      displayName: "getter",
+      method: "GET",
+      urlTemplate: "/getter",
+      description: "This can only be done by the logged in user.",
+      response: [{
+        statusCode: 200
+      }]
     })
 
     const apiManagementBackend = new ApiManagementBackend(this, "ApiManagementBackend", {
@@ -125,13 +133,14 @@ class PyTestRunnerStack extends TerraformStack {
       apiManagementName: apiManagement.name,
       resourceGroupName: resourceGroup.name,
       xmlContent: `
-      <policies>
-      <inbound>
-          <base />
-          <set-backend-service backend-id="${apiManagementBackend.name}" />
-      </inbound>
-  </policies>
-      `
+<policies>
+  <inbound>
+    <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
+    <base />
+    <set-backend-service backend-id="${apiManagementBackend.name}" />
+  </inbound>
+</policies>
+`
     })
   }
 }
