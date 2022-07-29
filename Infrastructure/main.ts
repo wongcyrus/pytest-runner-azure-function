@@ -4,8 +4,11 @@ import {
   AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, ApplicationInsights, DataAzurermFunctionAppHostKeys,
   ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation
 } from "cdktf-azure-providers/.gen/providers/azurerm";
+import { Resource } from "cdktf-azure-providers/.gen/providers/null"
+import { DataArchiveFile } from "cdktf-azure-providers/.gen/providers/archive"
 
 import * as dotenv from 'dotenv';
+import path = require("path");
 dotenv.config({ path: __dirname + '/.env' });
 
 class PyTestRunnerStack extends TerraformStack {
@@ -68,6 +71,43 @@ class PyTestRunnerStack extends TerraformStack {
       }
     })
 
+    const pythonProjectPath  = path.join(__dirname, "..","pytest-runner-func");
+    const buildFunctionAppResource = new Resource(this, "BuildFunctionAppResource",
+      {
+        triggers: { build_hash: "${timestamp()}" },
+        dependsOn: [linuxFunctionApp]
+      })
+
+    buildFunctionAppResource.addOverride("provisioner", [
+      {
+        "local-exec": {
+          working_dir: pythonProjectPath,
+          command: `pip install -r requirements.txt --target=.python_packages/lib/site-packages `
+        },
+      },
+    ]);    
+    const outputZip = path.join(pythonProjectPath, "../deployment.zip")
+    const dataArchiveFile = new DataArchiveFile(this, "DataArchiveFile", {
+      type: "zip",
+      sourceDir: pythonProjectPath,
+      outputPath: outputZip,
+      dependsOn: [buildFunctionAppResource]
+    })
+
+    const publishFunctionAppResource = new Resource(this, "PublishFunctionAppResource",
+      {
+        triggers: { build_hash: "${timestamp()}" },
+        dependsOn: [dataArchiveFile]
+      })
+
+    publishFunctionAppResource.addOverride("provisioner", [
+      {
+        "local-exec": {
+          command: `az functionapp deployment source config-zip --resource-group ${resourceGroup.name} --name ${linuxFunctionApp.name} --src ${dataArchiveFile.outputPath}`
+        },
+      },
+    ]);
+
     const dataAzurermFunctionAppHostKeys = new DataAzurermFunctionAppHostKeys(this, "DataAzurermFunctionAppHostKeys", {
       name: linuxFunctionApp.name,
       resourceGroupName: resourceGroup.name,
@@ -101,13 +141,13 @@ class PyTestRunnerStack extends TerraformStack {
     })
 
     new ApiManagementApiOperation(this, "ApiManagementApiOperation", {
-      operationId: "getter",
+      operationId: "pytester",
       apiManagementName: apiManagementApi.apiManagementName,
       apiName: apiManagementApi.name,
       resourceGroupName: resourceGroup.name,
-      displayName: "getter",
+      displayName: "pytester",
       method: "GET",
-      urlTemplate: "/getter",
+      urlTemplate: "/pytester",
       description: "This can only be done by the logged in user.",
       response: [{
         statusCode: 200
