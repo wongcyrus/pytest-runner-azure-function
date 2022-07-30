@@ -140,13 +140,27 @@ class PyTestRunnerStack extends TerraformStack {
       protocols: ["https"]
     })
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperation", {
-      operationId: "pytester",
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationGet", {
+      operationId: "pytester-get",
       apiManagementName: apiManagementApi.apiManagementName,
       apiName: apiManagementApi.name,
       resourceGroupName: resourceGroup.name,
-      displayName: "pytester",
+      displayName: "pytester-get",
       method: "GET",
+      urlTemplate: "/pytester",
+      description: "This can only be done by the logged in user.",
+      response: [{
+        statusCode: 200
+      }]
+    })
+
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationPost", {
+      operationId: "pytester-post",
+      apiManagementName: apiManagementApi.apiManagementName,
+      apiName: apiManagementApi.name,
+      resourceGroupName: resourceGroup.name,
+      displayName: "pytester-post",
+      method: "POST",
       urlTemplate: "/pytester",
       description: "This can only be done by the logged in user.",
       response: [{
@@ -175,6 +189,12 @@ class PyTestRunnerStack extends TerraformStack {
       xmlContent: `
 <policies>
   <inbound>
+    <set-header name="request-email" exists-action="override">
+      <value>@(context.User.Email)</value>
+    </set-header>
+    <set-header name="request-id" exists-action="override">
+      <value>@(context.User.Id)</value>
+    </set-header>
     <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
     <base />
     <set-backend-service backend-id="${apiManagementBackend.name}" />

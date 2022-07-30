@@ -9,7 +9,6 @@ import os
 import logging
 import json
 from pathlib import Path
-from urllib.parse import parse_qs
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -18,6 +17,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     # Example
     # sourceCodeFilePath = lab/lab01/ch01_t01_hello_world.py
     # sourceCode = `print("Hello, world!")`
+
+    logging.info("email:" + req.headers["request-email"])
+    email = req.headers["request-email"]
 
     if req.method == "GET":
         source_code_file_path = req.params.get("sourceCodeFilePath")
