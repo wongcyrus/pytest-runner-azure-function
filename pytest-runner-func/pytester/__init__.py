@@ -9,6 +9,8 @@ import os
 import logging
 import json
 from pathlib import Path
+from azure.data.tables import TableClient
+from azure.core.exceptions import HttpResponseError, ResourceExistsError
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
@@ -26,7 +28,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         source_code = req.params.get("sourceCode")
     else:
         req_body_bytes = req.get_body()
-        logging.info(f"Request Bytes: {req_body_bytes}")
         req_body = req_body_bytes.decode("utf-8")
         logging.info(f"Request: {req_body}")
         data = json.loads(req_body)
@@ -35,6 +36,21 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
     if not source_code or not source_code_file_path:
         return func.HttpResponse(body='{ "error": "source_code and source_code_file_path must present." }', status_code=422)
+
+    table_client = TableClient.from_connection_string(
+        conn_str=os.environ["CONNECTION_STRING"], table_name="TestResults")
+
+    row_key = source_code_file_path.replace("/", "->")
+
+    repeated_test = True
+    try:
+        r = table_client.get_entity(email, row_key)
+        logging.info(r)
+    except HttpResponseError:
+        repeated_test = False
+
+    if repeated_test:
+        return func.HttpResponse(body="Repeated Successful Test.", status_code=200)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         logging.info(tmpdirname)
@@ -72,14 +88,36 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             f'{pip_virtual_env_path} install -r requirements.txt')
         logging.info(test_result)
 
-        test_result_json = os.path.join(tmpdirname, 'result.json')
+        test_result_text = os.path.join(tmpdirname, 'result.json')
         cmd = f""". {activate_virtual_env_path}
-python -m pytest -v {test_code_file_path} --json-report --json-report-file={test_result_json}
+python -m pytest -v {test_code_file_path} --json-report --json-report-file={test_result_text}
 """
         test_result = subprocess.getoutput(cmd)
         logging.info(test_result)
-        test_result_json = Path(test_result_json).read_text()
-        logging.info(test_result_json)
+        test_result_text = Path(test_result_text).read_text()
+        logging.info(test_result_text)
         shutil.rmtree(tmpdirname)
 
-    return func.HttpResponse(body=test_result_json, status_code=200)
+        try:
+            test_result_json = json.loads(test_result_text)
+
+            logging.info(
+                test_result_json["summary"]["passed"] / test_result_json["summary"]["total"])
+            is_all_tests_passed = test_result_json["summary"]["passed"] / \
+                test_result_json["summary"]["total"] == 1
+
+            if is_all_tests_passed:
+                entity = {
+                    'PartitionKey': email,
+                    'RowKey': source_code_file_path.replace("/", "->")
+                }
+                logging.info(entity)
+                response = table_client.create_entity(entity)
+                logging.info(response)
+                return func.HttpResponse(body="Test Success and saved the result.", status_code=200)
+        except ResourceExistsError:
+            logging.info("Entity already exists")
+        except BaseException as ex:
+            logging.info(f"Unexpected {ex=}, {type(ex)=}")
+
+    return func.HttpResponse(body="Test unsucessful!.", status_code=200)

@@ -1,7 +1,7 @@
 import { Construct } from "constructs";
 import { App, TerraformStack } from "cdktf";
 import {
-  AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, ApplicationInsights, DataAzurermFunctionAppHostKeys,
+  AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, StorageTable, ApplicationInsights, DataAzurermFunctionAppHostKeys,
   ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation
 } from "cdktf-azure-providers/.gen/providers/azurerm";
 import { Resource } from "cdktf-azure-providers/.gen/providers/null"
@@ -37,6 +37,12 @@ class PyTestRunnerStack extends TerraformStack {
       accountTier: "Standard",
       accountReplicationType: "LRS"
     })
+
+    new StorageTable(this, "TestResultsStorageTable", {
+      name: "TestResults",
+      storageAccountName: storageAccount.name
+    })
+
     const applicationInsights = new ApplicationInsights(this, "ApplicationInsights", {
       name: prefix + "-" + environment + "applicationInsights",
       location: resourceGroup.location,
@@ -62,7 +68,8 @@ class PyTestRunnerStack extends TerraformStack {
       functionsExtensionVersion: "~4",
       appSettings: {
         FUNCTIONS_WORKER_RUNTIME: "python",
-        APPINSIGHTS_INSTRUMENTATIONKEY: applicationInsights.instrumentationKey
+        APPINSIGHTS_INSTRUMENTATIONKEY: applicationInsights.instrumentationKey,
+        CONNECTION_STRING: storageAccount.primaryConnectionString
       },
       siteConfig: {
         applicationStack: {
@@ -71,7 +78,7 @@ class PyTestRunnerStack extends TerraformStack {
       }
     })
 
-    const pythonProjectPath  = path.join(__dirname, "..","pytest-runner-func");
+    const pythonProjectPath = path.join(__dirname, "..", "pytest-runner-func");
     const buildFunctionAppResource = new Resource(this, "BuildFunctionAppResource",
       {
         triggers: { build_hash: "${timestamp()}" },
@@ -85,7 +92,7 @@ class PyTestRunnerStack extends TerraformStack {
           command: `pip install -r requirements.txt --target=.python_packages/lib/site-packages `
         },
       },
-    ]);    
+    ]);
     const outputZip = path.join(pythonProjectPath, "../deployment.zip")
     const dataArchiveFile = new DataArchiveFile(this, "DataArchiveFile", {
       type: "zip",
