@@ -1,5 +1,5 @@
 {
-  "name": "Infrastructure",
+  "name": "infrastructure",
   "version": "1.0.0",
   "main": "main.js",
   "types": "main.ts",
@@ -14,7 +14,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "upgrade": "npm i cdktf@latest cdktf-cli@latest",
-    "upgrade:next": "npm i cdktf@next cdktf-cli@next"
+    "upgrade:next": "npm i cdktf@next cdktf-cli@next",
+    "getstudentkey": "npx ts-node get_student_key.ts"
   },
   "engines": {
     "node": ">=14.0"
@@ -25,7 +26,8 @@
     "cdktf-azure-providers": "^0.0.5",
     "constructs": "^10.1.56",
     "csv-parse": "^5.3.0",
-    "dotenv": "^16.0.1"
+    "dotenv": "^16.0.1",
+    "json2csv": "^5.0.7"
   },
   "devDependencies": {
     "@types/jest": "^28.1.6",
