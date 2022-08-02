@@ -1,14 +1,19 @@
 import { Construct } from "constructs";
-import { App, TerraformStack } from "cdktf";
+import { App, TerraformStack, TerraformOutput } from "cdktf";
 import {
   AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, StorageTable, ApplicationInsights, DataAzurermFunctionAppHostKeys,
-  ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation
+  ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation,
+  ApiManagementUser, ApiManagementSubscription
 } from "cdktf-azure-providers/.gen/providers/azurerm";
 import { Resource } from "cdktf-azure-providers/.gen/providers/null"
 import { DataArchiveFile } from "cdktf-azure-providers/.gen/providers/archive"
 
 import * as dotenv from 'dotenv';
-import path = require("path");
+import * as fs from "fs";
+import * as path from "path";
+import { parse } from 'csv-parse/sync';
+
+
 dotenv.config({ path: __dirname + '/.env' });
 
 class PyTestRunnerStack extends TerraformStack {
@@ -98,6 +103,7 @@ class PyTestRunnerStack extends TerraformStack {
       type: "zip",
       sourceDir: pythonProjectPath,
       outputPath: outputZip,
+      excludes:[".venv"],
       dependsOn: [buildFunctionAppResource]
     })
 
@@ -110,7 +116,7 @@ class PyTestRunnerStack extends TerraformStack {
     publishFunctionAppResource.addOverride("provisioner", [
       {
         "local-exec": {
-          command: `az functionapp deployment source config-zip --resource-group ${resourceGroup.name} --name ${linuxFunctionApp.name} --src ${dataArchiveFile.outputPath}`
+          command: `az functionapp deployment source config-zip --resource-group ${resourceGroup.name} --name ${linuxFunctionApp.name} --src ${dataArchiveFile.outputPath} --build-remote true`
         },
       },
     ]);
@@ -203,12 +209,59 @@ class PyTestRunnerStack extends TerraformStack {
       <value>@(context.User.Id)</value>
     </set-header>
     <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
+    <rate-limit calls="10" renewal-period="60" />
     <base />
     <set-backend-service backend-id="${apiManagementBackend.name}" />
   </inbound>
 </policies>
 `
     })
+
+    type Student = {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+
+    const csvFilePath = path.resolve(__dirname, 'student_list.csv');
+    const headers = ['id', 'firstName', 'lastName', 'email'];  
+    const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' });
+
+    const students:Student[] = parse(fileContent, {
+      delimiter: ',',
+      columns: headers,
+      from_line: 2
+    });
+    let i = 0;
+    for (let student of students) {
+      const apiManagementUser = new ApiManagementUser(this, "ApiManagementUser" + i, {
+        userId: student.id,
+        apiManagementName: apiManagement.name,
+        resourceGroupName: resourceGroup.name,
+        email: student.email,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        state: "active"
+      })
+
+      const apiManagementSubscription = new ApiManagementSubscription(this, "ApiManagementSubscription" + i, {
+        apiManagementName: apiManagement.name,
+        resourceGroupName: resourceGroup.name,
+        userId: apiManagementUser.id,
+        displayName: student.id + ":" + student.firstName + " " + student.lastName,
+        apiId: apiManagementApi.id,
+        state: "active"
+      })
+
+      new TerraformOutput(this, "SubscriptionKey_" + i, {
+        sensitive: true,
+        value: apiManagementSubscription.primaryKey
+      });
+      i++;
+    }
+
+
   }
 }
 
