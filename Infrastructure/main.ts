@@ -103,7 +103,7 @@ class PyTestRunnerStack extends TerraformStack {
       type: "zip",
       sourceDir: pythonProjectPath,
       outputPath: outputZip,
-      excludes:[".venv"],
+      excludes: [".venv"],
       dependsOn: [buildFunctionAppResource]
     })
 
@@ -153,7 +153,7 @@ class PyTestRunnerStack extends TerraformStack {
       protocols: ["https"]
     })
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationGet", {
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationPytesterGet", {
       operationId: "pytester-get",
       apiManagementName: apiManagementApi.apiManagementName,
       apiName: apiManagementApi.name,
@@ -167,7 +167,7 @@ class PyTestRunnerStack extends TerraformStack {
       }]
     })
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationPost", {
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationPytesterPost", {
       operationId: "pytester-post",
       apiManagementName: apiManagementApi.apiManagementName,
       apiName: apiManagementApi.name,
@@ -175,6 +175,34 @@ class PyTestRunnerStack extends TerraformStack {
       displayName: "pytester-post",
       method: "POST",
       urlTemplate: "/pytester",
+      description: "This can only be done by the logged in user.",
+      response: [{
+        statusCode: 200
+      }]
+    })
+
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationTestResultsGet", {
+      operationId: "test-results-get",
+      apiManagementName: apiManagementApi.apiManagementName,
+      apiName: apiManagementApi.name,
+      resourceGroupName: resourceGroup.name,
+      displayName: "test-results-get",
+      method: "GET",
+      urlTemplate: "/test-results",
+      description: "This can only be done by the logged in user.",
+      response: [{
+        statusCode: 200
+      }]
+    })
+
+    new ApiManagementApiOperation(this, "ApiManagementApiOperationTestResultsPost", {
+      operationId: "test-results-post",
+      apiManagementName: apiManagementApi.apiManagementName,
+      apiName: apiManagementApi.name,
+      resourceGroupName: resourceGroup.name,
+      displayName: "test-results-post",
+      method: "POST",
+      urlTemplate: "/test-results",
       description: "This can only be done by the logged in user.",
       response: [{
         statusCode: 200
@@ -225,10 +253,10 @@ class PyTestRunnerStack extends TerraformStack {
     };
 
     const csvFilePath = path.resolve(__dirname, 'student_list.csv');
-    const headers = ['id', 'firstName', 'lastName', 'email'];  
+    const headers = ['id', 'firstName', 'lastName', 'email'];
     const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' });
 
-    const students:Student[] = parse(fileContent, {
+    const students: Student[] = parse(fileContent, {
       delimiter: ',',
       columns: headers,
       from_line: 2
