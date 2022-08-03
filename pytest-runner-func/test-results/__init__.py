@@ -15,11 +15,6 @@ from azure.core.exceptions import HttpResponseError, ResourceExistsError
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("start:" + req.method)
-
-    # Example
-    # sourceCodeFilePath = lab/lab01/ch01_t01_hello_world.py
-    # sourceCode = `print("Hello, world!")`
-
     logging.info("email:" + req.headers["request-email"])
     email = req.headers["request-email"]
 
