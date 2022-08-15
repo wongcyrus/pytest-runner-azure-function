@@ -109,7 +109,8 @@ python -m pytest -v {test_code_file_path} --json-report --json-report-file={test
             if is_all_tests_passed:
                 entity = {
                     'PartitionKey': email,
-                    'RowKey': source_code_file_path.replace("/", "->")
+                    'RowKey': source_code_file_path.replace("/", "->"),
+                    'Code': source_code
                 }
                 logging.info(entity)
                 response = table_client.create_entity(entity)

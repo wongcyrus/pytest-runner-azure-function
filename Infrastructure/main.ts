@@ -153,61 +153,37 @@ class PyTestRunnerStack extends TerraformStack {
       protocols: ["https"]
     })
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationPytesterGet", {
-      operationId: "pytester-get",
-      apiManagementName: apiManagementApi.apiManagementName,
-      apiName: apiManagementApi.name,
-      resourceGroupName: resourceGroup.name,
-      displayName: "pytester-get",
-      method: "GET",
-      urlTemplate: "/pytester",
-      description: "This can only be done by the logged in user.",
-      response: [{
-        statusCode: 200
-      }]
-    })
+    const functions = ["pytester", "test-results"]
+    for (let f of functions) {
+      new ApiManagementApiOperation(this, "ApiManagementApiOperation" + f + "Get", {
+        operationId: f + "-get",
+        apiManagementName: apiManagementApi.apiManagementName,
+        apiName: apiManagementApi.name,
+        resourceGroupName: resourceGroup.name,
+        displayName: f + "-get",
+        method: "GET",
+        urlTemplate: "/" + f,
+        description: "This can only be done by the logged in user.",
+        response: [{
+          statusCode: 200
+        }]
+      })
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationPytesterPost", {
-      operationId: "pytester-post",
-      apiManagementName: apiManagementApi.apiManagementName,
-      apiName: apiManagementApi.name,
-      resourceGroupName: resourceGroup.name,
-      displayName: "pytester-post",
-      method: "POST",
-      urlTemplate: "/pytester",
-      description: "This can only be done by the logged in user.",
-      response: [{
-        statusCode: 200
-      }]
-    })
+      new ApiManagementApiOperation(this, "ApiManagementApiOperation" + f + "Post", {
+        operationId: f + "-post",
+        apiManagementName: apiManagementApi.apiManagementName,
+        apiName: apiManagementApi.name,
+        resourceGroupName: resourceGroup.name,
+        displayName: f + "-post",
+        method: "POST",
+        urlTemplate: "/" + f,
+        description: "This can only be done by the logged in user.",
+        response: [{
+          statusCode: 200
+        }]
+      })
+    }
 
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationTestResultsGet", {
-      operationId: "test-results-get",
-      apiManagementName: apiManagementApi.apiManagementName,
-      apiName: apiManagementApi.name,
-      resourceGroupName: resourceGroup.name,
-      displayName: "test-results-get",
-      method: "GET",
-      urlTemplate: "/test-results",
-      description: "This can only be done by the logged in user.",
-      response: [{
-        statusCode: 200
-      }]
-    })
-
-    new ApiManagementApiOperation(this, "ApiManagementApiOperationTestResultsPost", {
-      operationId: "test-results-post",
-      apiManagementName: apiManagementApi.apiManagementName,
-      apiName: apiManagementApi.name,
-      resourceGroupName: resourceGroup.name,
-      displayName: "test-results-post",
-      method: "POST",
-      urlTemplate: "/test-results",
-      description: "This can only be done by the logged in user.",
-      response: [{
-        statusCode: 200
-      }]
-    })
 
     const apiManagementBackend = new ApiManagementBackend(this, "ApiManagementBackend", {
       name: "pytestBackend",
@@ -245,12 +221,15 @@ class PyTestRunnerStack extends TerraformStack {
 `
     })
 
+
+
     type Student = {
       id: string;
       firstName: string;
       lastName: string;
       email: string;
     };
+
 
     const csvFilePath = path.resolve(__dirname, 'student_list.csv');
     const headers = ['id', 'firstName', 'lastName', 'email'];
