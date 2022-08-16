@@ -1,4 +1,3 @@
-import imp
 import logging
 import subprocess
 import azure.functions as func
