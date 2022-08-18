@@ -2,6 +2,10 @@
 
 This project executes Pytest in Azure Function with Consumption plan. Azure API Management protects Azure Function API and create one subscription per student. Successful test result saves into Azure storage table.
 
+## Enhancing GitHub Classroom with Azure serverless services
+Read this post for more details.
+https://techcommunity.microsoft.com/t5/educator-developer-blog/enhancing-github-classroom-with-azure-serverless-services/ba-p/3600682
+
 ## Prerequisites 
 Setup CDK-TF
 1. https://www.hashicorp.com/blog/building-azure-resources-with-typescript-using-the-cdk-for-terraform

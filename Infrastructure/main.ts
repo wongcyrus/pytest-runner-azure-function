@@ -1,17 +1,15 @@
+import { ApiUser, AzureApiManagementConstruct } from "azure-common-construct/patterns/AzureApiManagementConstruct";
+import { App, TerraformOutput, TerraformStack } from "cdktf";
+import { DataArchiveFile } from "cdktf-azure-providers/.gen/providers/archive";
+import { ApplicationInsights, AzurermProvider, LinuxFunctionApp, ResourceGroup, ServicePlan, StorageAccount, StorageTable } from "cdktf-azure-providers/.gen/providers/azurerm";
+import { Resource } from "cdktf-azure-providers/.gen/providers/null";
 import { Construct } from "constructs";
-import { App, TerraformStack, TerraformOutput } from "cdktf";
-import {
-  AzurermProvider, ResourceGroup, LinuxFunctionApp, ServicePlan, StorageAccount, StorageTable, ApplicationInsights, DataAzurermFunctionAppHostKeys,
-  ApiManagement, ApiManagementApi, ApiManagementBackend, ApiManagementNamedValue, ApiManagementApiPolicy, ApiManagementApiOperation,
-  ApiManagementUser, ApiManagementSubscription
-} from "cdktf-azure-providers/.gen/providers/azurerm";
-import { Resource } from "cdktf-azure-providers/.gen/providers/null"
-import { DataArchiveFile } from "cdktf-azure-providers/.gen/providers/archive"
 
+
+import { parse } from 'csv-parse/sync';
 import * as dotenv from 'dotenv';
 import * as fs from "fs";
 import * as path from "path";
-import { parse } from 'csv-parse/sync';
 
 
 dotenv.config({ path: __dirname + '/.env' });
@@ -121,155 +119,47 @@ class PyTestRunnerStack extends TerraformStack {
       },
     ]);
 
-    const dataAzurermFunctionAppHostKeys = new DataAzurermFunctionAppHostKeys(this, "DataAzurermFunctionAppHostKeys", {
-      name: linuxFunctionApp.name,
-      resourceGroupName: resourceGroup.name,
-    })
-
-    const apiManagement = new ApiManagement(this, "ApiManagement", {
-      name: `api-${process.env.API_NAME!}`,
-      location: resourceGroup.location,
-      publisherName: process.env.PUBLISHER_NAME!,
-      publisherEmail: process.env.PUBLISHER_EMAIL!,
-      resourceGroupName: resourceGroup.name,
-      skuName: "Basic_1"
-    })
-
-    const apiManagementNamedValue = new ApiManagementNamedValue(this, "ApiManagementNamedValue", {
-      name: "func-functionkey",
-      resourceGroupName: resourceGroup.name,
-      apiManagementName: apiManagement.name,
-      displayName: "func-functionkey",
-      value: dataAzurermFunctionAppHostKeys.primaryKey,
-      secret: true
-    })
-
-    const apiManagementApi = new ApiManagementApi(this, "ApiManagementApi", {
-      name: "pytest-runner",
-      resourceGroupName: resourceGroup.name,
-      apiManagementName: apiManagement.name,
-      revision: "2",
-      displayName: "Pytest Runner",
-      protocols: ["https"]
-    })
-
-    const functions = ["pytester", "test-results"]
-    for (let f of functions) {
-      new ApiManagementApiOperation(this, "ApiManagementApiOperation" + f + "Get", {
-        operationId: f + "-get",
-        apiManagementName: apiManagementApi.apiManagementName,
-        apiName: apiManagementApi.name,
-        resourceGroupName: resourceGroup.name,
-        displayName: f + "-get",
-        method: "GET",
-        urlTemplate: "/" + f,
-        description: "This can only be done by the logged in user.",
-        response: [{
-          statusCode: 200
-        }]
-      })
-
-      new ApiManagementApiOperation(this, "ApiManagementApiOperation" + f + "Post", {
-        operationId: f + "-post",
-        apiManagementName: apiManagementApi.apiManagementName,
-        apiName: apiManagementApi.name,
-        resourceGroupName: resourceGroup.name,
-        displayName: f + "-post",
-        method: "POST",
-        urlTemplate: "/" + f,
-        description: "This can only be done by the logged in user.",
-        response: [{
-          statusCode: 200
-        }]
-      })
-    }
-
-
-    const apiManagementBackend = new ApiManagementBackend(this, "ApiManagementBackend", {
-      name: "pytestBackend",
-      resourceGroupName: resourceGroup.name,
-      apiManagementName: apiManagement.name,
-      protocol: "http",
-      url: `https://${linuxFunctionApp.defaultHostname}/api/`,
-      dependsOn: [apiManagementNamedValue],
-      credentials: {
-        header: {
-          "x-functions-key": "{{func-functionkey}}"
-        }
-      }
-    })
-
-    new ApiManagementApiPolicy(this, "ApiManagementApiPolicy", {
-      apiName: apiManagementApi.name,
-      apiManagementName: apiManagement.name,
-      resourceGroupName: resourceGroup.name,
-      xmlContent: `
-<policies>
-  <inbound>
-    <set-header name="request-email" exists-action="override">
-      <value>@(context.User.Email)</value>
-    </set-header>
-    <set-header name="request-id" exists-action="override">
-      <value>@(context.User.Id)</value>
-    </set-header>
-    <rate-limit-by-key calls="10" renewal-period="60" counter-key="@(context.Request.IpAddress)" />
-    <rate-limit calls="10" renewal-period="60" />
-    <base />
-    <set-backend-service backend-id="${apiManagementBackend.name}" />
-  </inbound>
-</policies>
-`
-    })
-
-
-
-    type Student = {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-    };
-
 
     const csvFilePath = path.resolve(__dirname, 'student_list.csv');
     const headers = ['id', 'firstName', 'lastName', 'email'];
     const fileContent = fs.readFileSync(csvFilePath, { encoding: 'utf-8' });
 
-    const students: Student[] = parse(fileContent, {
+    const apiUsers: ApiUser[] = parse(fileContent, {
       delimiter: ',',
       columns: headers,
       from_line: 2
     });
+
+    const azureApiManagementConstruct = new AzureApiManagementConstruct(this, "AzureApiManagementConstruct", {
+      apiName: process.env.API_NAME!,
+      environment,
+      prefix,
+      functionApp: linuxFunctionApp,
+      publisherEmail: process.env.PUBLISHER_EMAIL!,
+      publisherName: process.env.PUBLISHER_NAME!,
+      resourceGroup,
+      skuName: "Basic_1",
+      wpiUsers: apiUsers,
+      functionNames: ["pytester", "test-results"],
+      ipRateLimit: 10,
+      keyRateLimit: 10,
+      corsDomain: "*"
+    })
+
+    new TerraformOutput(this, "ApiManagementUrl", {
+      value: `${azureApiManagementConstruct.apiManagement.gatewayUrl}`
+    })
+
     let i = 0;
-    for (let student of students) {
-      const apiManagementUser = new ApiManagementUser(this, "ApiManagementUser" + i, {
-        userId: student.id,
-        apiManagementName: apiManagement.name,
-        resourceGroupName: resourceGroup.name,
-        email: student.email,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        state: "active"
-      })
-
-      const apiManagementSubscription = new ApiManagementSubscription(this, "ApiManagementSubscription" + i, {
-        apiManagementName: apiManagement.name,
-        resourceGroupName: resourceGroup.name,
-        userId: apiManagementUser.id,
-        displayName: student.id + ":" + student.firstName + " " + student.lastName,
-        apiId: apiManagementApi.id,
-        state: "active"
-      })
-
+    for (let apiKey of azureApiManagementConstruct.apiUsers) {
       new TerraformOutput(this, "SubscriptionKey_" + i, {
         sensitive: true,
-        value: apiManagementSubscription.primaryKey
+        value: apiKey.apiKey
       });
       i++;
     }
-
-
   }
+
 }
 
 const app = new App({ skipValidation: true });
