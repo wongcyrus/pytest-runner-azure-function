@@ -25,7 +25,7 @@ class PyTestRunnerStack extends TerraformStack {
       }
     })
 
-    const prefix = "PytestRunner"
+    const prefix = process.env.PREFIX!
     const environment = "dev"
 
     const resourceGroup = new ResourceGroup(this, "ResourceGroup", {

@@ -1,10 +1,5 @@
-import imp
 import logging
-import subprocess
 import azure.functions as func
-import zipfile
-import tempfile
-import shutil
 import os
 import logging
 import json
@@ -27,7 +22,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         }
         query_filter = "PartitionKey eq @pk"
         result = list(table_client.query_entities(
-            query_filter, parameters=parameters))    
+            query_filter, parameters=parameters, select="RowKey"))
         logging.info(result)
     except HttpResponseError as ex:
         return func.HttpResponse(body=ex, status_code=500)
