@@ -25,6 +25,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     if req.method == "GET":
         source_code_file_path = req.params.get("sourceCodeFilePath")
         source_code = req.params.get("sourceCode")
+        service_account_key = req.params.get("serviceAccountKey")
     else:
         req_body_bytes = req.get_body()
         req_body = req_body_bytes.decode("utf-8")
@@ -32,9 +33,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         data = json.loads(req_body)
         source_code_file_path = data["sourceCodeFilePath"]
         source_code = data["sourceCode"]
+        service_account_key = data["serviceAccountKey"]
 
-    if not source_code or not source_code_file_path:
-        return func.HttpResponse(body='{ "error": "source_code and source_code_file_path must present." }', status_code=422)
+    if not source_code or not source_code_file_path or not service_account_key:
+        return func.HttpResponse(body='{ "error": "source_code, source_code_file_path and service_account_key must present." }', status_code=422)
 
     table_client = TableClient.from_connection_string(
         conn_str=os.environ["CONNECTION_STRING"], table_name="TestResults")
@@ -65,6 +67,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             tmpdirname, "assignments", source_code_file_path)
         with open(code_file_path, 'w') as filetowrite:
             filetowrite.write(source_code)
+
+        service_account_key_file_path = os.path.join(
+            tmpdirname, "assignments", "service_account_key.json")
+        with open(service_account_key_file_path, 'w') as filetowrite:
+            filetowrite.write(service_account_key)
 
         text = Path(code_file_path).read_text()
         logging.info(text)
