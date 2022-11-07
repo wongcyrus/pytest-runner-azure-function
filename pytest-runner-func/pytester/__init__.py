@@ -26,6 +26,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         source_code_file_path = req.params.get("sourceCodeFilePath")
         source_code = req.params.get("sourceCode")
         service_account_key = req.params.get("serviceAccountKey")
+        config_py = req.params.get("config_py")
     else:
         req_body_bytes = req.get_body()
         req_body = req_body_bytes.decode("utf-8")
@@ -34,6 +35,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         source_code_file_path = data["sourceCodeFilePath"]
         source_code = data["sourceCode"]
         service_account_key = data["serviceAccountKey"]
+        config_py = data["config_py"]
 
     if not source_code or not source_code_file_path or not service_account_key:
         return func.HttpResponse(body='{ "error": "source_code, source_code_file_path and service_account_key must present." }', status_code=422)
@@ -72,6 +74,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             tmpdirname, "assignments", "service_account_key.json")
         with open(service_account_key_file_path, 'w') as filetowrite:
             filetowrite.write(service_account_key)
+
+        config_py_file_path = os.path.join(
+            tmpdirname, "assignments", "config.py")
+        with open(config_py_file_path, 'w') as filetowrite:
+            filetowrite.write(config_py)
 
         text = Path(code_file_path).read_text()
         logging.info(text)
